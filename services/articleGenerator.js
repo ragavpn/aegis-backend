@@ -10,8 +10,8 @@ export const generateAndStoreArticle = async () => {
 
     // 1. Fetch latest data from Crucix
     const sweepData = await getCrucixLatest();
-    if (!sweepData || !sweepData.data) {
-      logger.warn('No sweep data available from Crucix');
+    if (!sweepData || sweepData.error) {
+      logger.warn(`No sweep data available from Crucix: ${sweepData?.error || 'Empty response'}`);
       return;
     }
 
