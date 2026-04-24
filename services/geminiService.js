@@ -17,7 +17,7 @@ const getGenAI = () => {
 export const generateArticle = async (sweepData, graphContext = "") => {
   const ai = getGenAI();
   const model = ai.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.1-pro-preview",
     systemInstruction: "You are an expert geopolitical and financial analyst. You take raw intelligence signals and synthesize them into a single, cohesive, highly insightful article of 400-800 words. Explain what is happening, why it is happening (historical context), and what it might mean (implications). If graph context is provided, use those historical causal chains to enrich the article. Your output must be purely the article text."
   });
 
@@ -45,7 +45,7 @@ Write the analyst report:
 export const extractEdges = async (articleText) => {
   const ai = getGenAI();
   const model = ai.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.1-pro-preview",
     systemInstruction: "You are a data extraction expert building a geopolitical knowledge graph. Extract up to 5 causal relationships from the provided article. Normalise entity names to be concise (e.g. 'Russia' instead of 'The Russian Federation'). Return exactly a JSON array of objects, with no markdown code blocks or other text.",
     generationConfig: {
       responseMimeType: "application/json",
