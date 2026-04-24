@@ -46,6 +46,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
+import { startSweepWatcher } from './services/sweepWatcher.js';
+
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
+  // Start background tasks
+  startSweepWatcher();
 });
