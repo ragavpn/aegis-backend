@@ -1,4 +1,4 @@
-import { getNeo4jSession } from '../db/neo4jClient.js';
+import { getSession } from '../db/neo4jClient.js';
 import logger from '../utils/logger.js';
 
 // Lookup map for entity normalization
@@ -41,7 +41,7 @@ export const storeEdges = async (edges, articleId) => {
   if (!edges || edges.length === 0) return;
 
   const normalisedEdges = normaliseEntities(edges);
-  const session = getNeo4jSession();
+  const session = getSession();
 
   try {
     for (const edge of normalisedEdges) {
