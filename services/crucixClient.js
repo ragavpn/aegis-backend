@@ -29,3 +29,18 @@ export const getCrucixHealth = async () => {
   }
   return res.json();
 };
+
+export const getCrucixDelta = async () => {
+  const res = await fetch(`${getBaseUrl()}/api/aegis/delta`, {
+    headers: {
+      'X-Aegis-Secret': getSecret()
+    }
+  });
+  if (res.status === 503) {
+    return { error: 'No data yet' };
+  }
+  if (!res.ok) {
+    throw new Error(`Crucix delta failed: ${res.statusText}`);
+  }
+  return res.json();
+};

@@ -143,8 +143,6 @@ export const extractEntitiesFromQuery = async (query) => {
           { role: 'system', content: systemInstruction },
           { role: 'user', content: query }
         ]
-        // NOTE: Do NOT use response_format: json_object here — it forces an object
-        // wrapper which breaks array responses on most OpenRouter models.
       })
     });
 
@@ -180,6 +178,60 @@ export const extractEntitiesFromQuery = async (query) => {
     return parsed;
   } catch (error) {
     logger.error(`Failed to extract entities from query: ${error.message}`);
+    return [];
+  }
+};
+
+// Extracts up to 5 key entities from a generic text (like a sweep summary)
+export const extractEntities = async (textInput) => {
+  const model = getModel();
+  const systemInstruction = "You are an entity extraction assistant. Extract up to 5 key entities (countries, commodities, companies, indices, organizations, people) from the provided text. Return ONLY a raw JSON array of strings, nothing else. No markdown, no explanation. Example output: [\"USA\", \"Gold\", \"Federal Reserve\"]";
+
+  try {
+    const res = await fetch(getBaseUrl(), {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: textInput }
+        ]
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    let text = data.choices?.[0]?.message?.content || '[]';
+    
+    // Clean markdown
+    text = text.trim();
+    if (text.startsWith('```json')) text = text.substring(7);
+    else if (text.startsWith('```')) text = text.substring(3);
+    if (text.endsWith('```')) text = text.substring(0, text.length - 3);
+    text = text.trim();
+    
+    // Extract first JSON array found anywhere in the text
+    const arrayMatch = text.match(/\[[\s\S]*?\]/);
+    if (arrayMatch) {
+      text = arrayMatch[0];
+    }
+
+    let parsed = JSON.parse(text);
+    
+    if (!Array.isArray(parsed)) {
+      const arrayVals = Object.values(parsed).filter(Array.isArray);
+      parsed = arrayVals.length > 0 ? arrayVals[0] : [];
+    }
+
+    logger.info(`Extracted entities from text: ${JSON.stringify(parsed)}`);
+    return parsed;
+  } catch (error) {
+    logger.error(`Failed to extract entities from text: ${error.message}`);
     return [];
   }
 };

@@ -1,5 +1,5 @@
 import { getCrucixLatest } from './crucixClient.js';
-import { generateArticle, extractEdges } from './llmService.js';
+import { generateArticle, extractEdges, extractEntities } from './llmService.js';
 import { storeEdges, getGraphContext } from './graphService.js';
 import { insertArticle } from '../db/queries/articles.js';
 import { sendArticleNotification } from './notificationService.js';
@@ -32,11 +32,25 @@ export const generateAndStoreArticle = async () => {
     delete prunedData.delta; 
     delete prunedData.ideas; 
 
-    // We can run a preliminary pass to extract entities from sweep data or just pass no graph context initially
-    const graphContext = ""; 
-    const graph_context_used = false;
+    // 3. Extract entities and get graph context
+    logger.info('Extracting entities from sweep summary for graph context...');
+    const summaryText = JSON.stringify(prunedData.news || prunedData.tg?.urgent || []);
+    const entities = await extractEntities(summaryText);
+    
+    let graphContext = "";
+    let graph_context_used = false;
 
-    // 3. Generate Article
+    if (entities && entities.length > 0) {
+      logger.info(`Fetching Neo4j graph context for entities: ${entities.join(', ')}`);
+      graphContext = await getGraphContext(entities);
+      if (graphContext && !graphContext.includes('No relevant graph context found')) {
+        graph_context_used = true;
+      }
+    } else {
+      logger.info('No entities extracted, skipping graph context retrieval.');
+    }
+
+    // 4. Generate Article
     logger.info('Calling OpenRouter to generate article text...');
     const articleText = await generateArticle(prunedData, graphContext);
 
