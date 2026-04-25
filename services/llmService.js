@@ -131,7 +131,7 @@ ${articleText}
 // Extracts up to 5 main entities from a user's conversational query to look up in Neo4j
 export const extractEntitiesFromQuery = async (query) => {
   const model = getModel();
-  const systemInstruction = "You are a precise entity extraction assistant. The user will ask a question about geopolitics or finance. Extract up to 5 key entities (countries, commodities, companies, indices, organizations, people) from their query. Return EXACTLY a JSON array of strings with no markdown formatting. Example: [\"Russia\", \"WTI Crude Oil\", \"OPEC\"]";
+  const systemInstruction = "You are a precise entity extraction assistant. The user will ask a question about geopolitics or finance. Extract up to 5 key entities (countries, commodities, companies, indices, organizations, people) from their query. Return ONLY a raw JSON array of strings, nothing else. No markdown, no explanation. Example output: [\"Russia\", \"WTI Crude Oil\", \"OPEC\"]";
 
   try {
     const res = await fetch(getBaseUrl(), {
@@ -142,8 +142,9 @@ export const extractEntitiesFromQuery = async (query) => {
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: query }
-        ],
-        response_format: { type: "json_object" } 
+        ]
+        // NOTE: Do NOT use response_format: json_object here — it forces an object
+        // wrapper which breaks array responses on most OpenRouter models.
       })
     });
 
@@ -157,11 +158,17 @@ export const extractEntitiesFromQuery = async (query) => {
     
     // Clean markdown
     text = text.trim();
-    if (text.startsWith('\`\`\`json')) text = text.substring(7);
-    else if (text.startsWith('\`\`\`')) text = text.substring(3);
-    if (text.endsWith('\`\`\`')) text = text.substring(0, text.length - 3);
+    if (text.startsWith('```json')) text = text.substring(7);
+    else if (text.startsWith('```')) text = text.substring(3);
+    if (text.endsWith('```')) text = text.substring(0, text.length - 3);
     text = text.trim();
     
+    // Extract first JSON array found anywhere in the text (handles cases where model adds explanation)
+    const arrayMatch = text.match(/\[[\s\S]*?\]/);
+    if (arrayMatch) {
+      text = arrayMatch[0];
+    }
+
     let parsed = JSON.parse(text);
     
     if (!Array.isArray(parsed)) {
@@ -169,6 +176,7 @@ export const extractEntitiesFromQuery = async (query) => {
       parsed = arrayVals.length > 0 ? arrayVals[0] : [];
     }
 
+    logger.info(`Extracted entities: ${JSON.stringify(parsed)}`);
     return parsed;
   } catch (error) {
     logger.error(`Failed to extract entities from query: ${error.message}`);
@@ -179,12 +187,16 @@ export const extractEntitiesFromQuery = async (query) => {
 // Generates the final conversational response heavily grounded in Neo4j graph context
 export const chatWithRAG = async (messages, graphContext = "") => {
   const model = getModel();
-  const systemInstruction = `You are Aegis, an elite, highly intelligent geopolitical and financial analyst. You provide concise, deep, and actionable answers to the user's questions.
+  
+  const hasContext = graphContext && graphContext.trim().length > 0;
 
-When answering, ALWAYS prioritize the historical context and causal relationships provided below. If context is provided, trace the causal chain for the user so they understand WHY something is happening, not just WHAT is happening. If no graph context is relevant, answer using your general knowledge but state that you don't have recent Aegis Intelligence on that specific topic.
+  const systemInstruction = `You are Aegis, an elite geopolitical and financial intelligence analyst. You have access to a live intelligence database with real, recently generated reports.
 
-Historical Knowledge Graph Context:
-${graphContext ? graphContext : "None available for this query."}`;
+${hasContext ? `You have been provided with the following intelligence context. You MUST use this as your primary source. Do NOT say you lack recent information — you have it below.
+
+${graphContext}
+
+When answering, synthesize the above intelligence with your analytical expertise. Cite specific articles or causal chains from the context above when relevant.` : `Answer using your general geopolitical and financial expertise. Be analytical, concise, and actionable.`}`;
 
   try {
     const apiMessages = [

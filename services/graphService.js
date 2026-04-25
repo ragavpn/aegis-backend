@@ -70,13 +70,13 @@ export const getGraphContext = async (entityNames) => {
   
   const session = getSession();
   try {
-    // Basic 2-hop retrieval
+    // Case-insensitive 2-hop retrieval
     const result = await session.run(`
       MATCH (n:Entity)-[r*1..2]-(m:Entity)
-      WHERE n.name IN $entityNames
+      WHERE toLower(n.name) IN $entityNames
       RETURN n.name AS source, [rel IN r | rel.type] AS relationships, m.name AS target
-      LIMIT 15
-    `, { entityNames });
+      LIMIT 20
+    `, { entityNames: entityNames.map(e => e.toLowerCase()) });
 
     if (result.records.length === 0) return "No relevant graph context found.";
 
