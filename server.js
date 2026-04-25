@@ -32,10 +32,12 @@ app.use(limiter);
 import dataRoutes from './routes/data.js';
 import preferencesRoutes from './routes/preferences.js';
 import conversationsRoutes from './routes/conversations.js';
+import notificationsRoutes from './routes/notifications.js';
 
 app.use('/data', dataRoutes);
 app.use('/preferences', preferencesRoutes);
 app.use('/conversations', conversationsRoutes);
+app.use('/notifications', notificationsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

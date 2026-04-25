@@ -2,6 +2,7 @@ import { getCrucixLatest } from './crucixClient.js';
 import { generateArticle, extractEdges } from './llmService.js';
 import { storeEdges, getGraphContext } from './graphService.js';
 import { insertArticle } from '../db/queries/articles.js';
+import { sendArticleNotification } from './notificationService.js';
 import logger from '../utils/logger.js';
 
 export const generateAndStoreArticle = async () => {
@@ -71,6 +72,10 @@ export const generateAndStoreArticle = async () => {
     } else {
       logger.warn('No edges were extracted from the article.');
     }
+
+    // 6. Send Push Notification
+    logger.info('Sending push notifications for the new article...');
+    await sendArticleNotification(savedArticle.title, savedArticle.id);
 
     logger.info('Article generation pipeline completed successfully.');
     return savedArticle;
