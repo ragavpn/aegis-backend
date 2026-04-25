@@ -15,20 +15,24 @@ export const generateAndStoreArticle = async () => {
       return false;
     }
 
-    // For the sake of the prototype, we extract some key entities to query the graph context.
-    // In a fully developed version, we might use an initial prompt to extract entities from sweep data first.
-    // Here we'll just query based on a static list or dynamically extract from the payload.
-    // We will ask Gemini to generate the article first, then extract edges from it.
-    
+    // 2. Prune data to avoid LLM token limits (especially for Groq free tier)
+    const prunedData = JSON.parse(JSON.stringify(sweepData));
+    if (prunedData.news) {
+      prunedData.news = prunedData.news.slice(0, 10).map(n => ({ title: n.title, summary: n.summary ? n.summary.substring(0, 300) : '' }));
+    }
+    if (prunedData.tg && prunedData.tg.urgent) {
+      prunedData.tg.urgent = prunedData.tg.urgent.map(p => ({ source: p.source, text: p.text ? p.text.substring(0, 300) : '' }));
+    }
+    delete prunedData.delta; // Remove large nested objects not strictly needed for the article
+    delete prunedData.ideas; 
+
     // We can run a preliminary pass to extract entities from sweep data or just pass no graph context initially
-    // For simplicity, we won't query Neo4j yet until we have the article generated, OR we could skip graph context for now if we don't have entities.
-    // Let's assume we don't have entity names yet, so we pass empty graph context.
     const graphContext = ""; 
     const graph_context_used = false;
 
-    // 2. Generate Article
+    // 3. Generate Article
     logger.info('Calling OpenRouter to generate article text...');
-    const articleText = await generateArticle(sweepData, graphContext);
+    const articleText = await generateArticle(prunedData, graphContext);
 
     // Provide a simple title/summary extraction manually or ask Gemini to provide a JSON format.
     // For now, we'll assign a placeholder title and summary, but in production we'd want Gemini to format its output as JSON with {title, summary, body}.
