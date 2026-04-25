@@ -179,12 +179,12 @@ export const extractEntitiesFromQuery = async (query) => {
 // Generates the final conversational response heavily grounded in Neo4j graph context
 export const chatWithRAG = async (messages, graphContext = "") => {
   const model = getModel();
-  const systemInstruction = \`You are Aegis, an elite, highly intelligent geopolitical and financial analyst. You provide concise, deep, and actionable answers to the user's questions.
+  const systemInstruction = `You are Aegis, an elite, highly intelligent geopolitical and financial analyst. You provide concise, deep, and actionable answers to the user's questions.
 
 When answering, ALWAYS prioritize the historical context and causal relationships provided below. If context is provided, trace the causal chain for the user so they understand WHY something is happening, not just WHAT is happening. If no graph context is relevant, answer using your general knowledge but state that you don't have recent Aegis Intelligence on that specific topic.
 
 Historical Knowledge Graph Context:
-\${graphContext ? graphContext : "None available for this query."}\`;
+${graphContext ? graphContext : "None available for this query."}`;
 
   try {
     const apiMessages = [
