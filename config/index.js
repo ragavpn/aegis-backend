@@ -10,7 +10,7 @@ const requiredEnvVars = [
   'NEO4J_PASSWORD',
   'CRUCIX_BASE_URL',
   'CRUCIX_SECRET',
-  'GEMINI_API_KEY'
+  'OPENROUTER_API_KEY'
 ];
 
 export const validateEnv = () => {

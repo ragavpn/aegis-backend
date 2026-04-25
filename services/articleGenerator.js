@@ -1,5 +1,5 @@
 import { getCrucixLatest } from './crucixClient.js';
-import { generateArticle, extractEdges } from './geminiService.js';
+import { generateArticle, extractEdges } from './llmService.js';
 import { storeEdges, getGraphContext } from './graphService.js';
 import { insertArticle } from '../db/queries/articles.js';
 import logger from '../utils/logger.js';
