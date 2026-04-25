@@ -27,7 +27,7 @@ export const generateAndStoreArticle = async () => {
     const graph_context_used = false;
 
     // 2. Generate Article
-    logger.info('Calling Gemini to generate article text...');
+    logger.info('Calling OpenRouter to generate article text...');
     const articleText = await generateArticle(sweepData, graphContext);
 
     // Provide a simple title/summary extraction manually or ask Gemini to provide a JSON format.
@@ -66,7 +66,7 @@ export const generateAndStoreArticle = async () => {
     logger.info('Article generation pipeline completed successfully.');
     return savedArticle;
   } catch (error) {
-    logger.error({ err: error }, 'Article generation pipeline failed');
+    logger.error(`Article generation pipeline failed: ${error.message}`);
     throw error;
   }
 };

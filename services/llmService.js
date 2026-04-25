@@ -52,7 +52,7 @@ Write the analyst report:
     const data = await res.json();
     return data.choices?.[0]?.message?.content || '';
   } catch (error) {
-    logger.error({ err: error }, 'Failed to generate article from OpenRouter');
+    logger.error(`Failed to generate article from OpenRouter: ${error.message}`);
     throw error;
   }
 };
@@ -118,7 +118,7 @@ ${articleText}
 
     return parsed;
   } catch (error) {
-    logger.error({ err: error }, 'Failed to extract edges from OpenRouter');
+    logger.error(`Failed to extract edges from OpenRouter: ${error.message}`);
     // We return an empty array so a failure in edge extraction doesn't crash the whole pipeline
     return [];
   }
