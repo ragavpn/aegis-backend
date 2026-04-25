@@ -1,10 +1,12 @@
 import express from 'express';
+import { requireAuth } from '../middleware/auth.js';
 import { getArticleById } from '../db/queries/articles.js';
 import { getPodcastByArticleId, savePodcast } from '../db/queries/podcasts.js';
 import { generatePodcast } from '../services/ttsService.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+router.use(requireAuth);
 
 /**
  * POST /podcasts/generate

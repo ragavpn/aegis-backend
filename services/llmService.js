@@ -131,7 +131,7 @@ ${articleText}
 // Extracts up to 5 main entities from a user's conversational query to look up in Neo4j
 export const extractEntitiesFromQuery = async (query) => {
   const model = getModel();
-  const systemInstruction = "You are a precise entity extraction assistant. The user will ask a question about geopolitics or finance. Extract up to 5 key entities (countries, commodities, companies, indices, organizations, people) from their query. Return ONLY a raw JSON array of strings, nothing else. No markdown, no explanation. Example output: [\"Russia\", \"WTI Crude Oil\", \"OPEC\"]";
+  const systemInstruction = "You are a precise entity extraction assistant. The user will ask a question about geopolitics or finance. Extract up to 5 key entities (countries, regions, commodities, companies, indices, organizations, people, or major topics) from their query. Return ONLY a raw JSON array of strings, nothing else. No markdown, no explanation. Example output: [\"Russia\", \"WTI Crude Oil\", \"OPEC\", \"Geopolitics\"]";
 
   try {
     const res = await fetch(getBaseUrl(), {
@@ -236,17 +236,17 @@ export const extractEntities = async (textInput) => {
   }
 };
 
-// Generates the final conversational response heavily grounded in Neo4j graph context
-export const chatWithRAG = async (messages, graphContext = "") => {
+// Generates the final conversational response heavily grounded in Neo4j graph context or recent articles
+export const chatWithRAG = async (messages, combinedContext = "") => {
   const model = getModel();
   
-  const hasContext = graphContext && graphContext.trim().length > 0;
+  const hasContext = combinedContext && combinedContext.trim().length > 0;
 
   const systemInstruction = `You are Aegis, an elite geopolitical and financial intelligence analyst. You have access to a live intelligence database with real, recently generated reports.
 
 ${hasContext ? `You have been provided with the following intelligence context. You MUST use this as your primary source. Do NOT say you lack recent information — you have it below.
 
-${graphContext}
+${combinedContext}
 
 When answering, synthesize the above intelligence with your analytical expertise. Cite specific articles or causal chains from the context above when relevant.` : `Answer using your general geopolitical and financial expertise. Be analytical, concise, and actionable.`}`;
 

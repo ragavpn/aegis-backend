@@ -2,6 +2,7 @@ import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
 import { generateDialogue } from './llmService.js';
 import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -21,6 +22,8 @@ const unlinkAsync = promisify(fs.unlink);
 export const generatePodcast = async (articleId, article) => {
   let tempFiles = [];
   let mergedFile = null;
+
+  ffmpeg.setFfmpegPath(ffmpegStatic);
 
   try {
     const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -81,6 +84,7 @@ export const generatePodcast = async (articleId, article) => {
     }
 
     mergedFile = path.join(tmpDir, `aegis_${articleId}_final.mp3`);
+    if (fs.existsSync(mergedFile)) await unlinkAsync(mergedFile);
 
     logger.info(`[TTS] Concatenating ${tempFiles.length} files...`);
     
