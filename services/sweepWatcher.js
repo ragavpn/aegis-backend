@@ -24,7 +24,12 @@ const runSweepCheck = async () => {
   isRunning = true;
   try {
     logger.info('Sweep watcher triggered. Running article generator...');
-    await generateAndStoreArticle();
+    const result = await generateAndStoreArticle();
+    
+    if (result === false) {
+      logger.info('Sweep not ready. Retrying in 1 minute...');
+      setTimeout(runSweepCheck, 60 * 1000);
+    }
   } catch (error) {
     logger.error({ err: error }, 'Sweep watcher failed during article generation');
   } finally {

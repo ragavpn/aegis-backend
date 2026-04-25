@@ -9,6 +9,9 @@ export const getCrucixLatest = async () => {
       'X-Aegis-Secret': getSecret()
     }
   });
+  if (res.status === 503) {
+    return { error: 'No data yet - first sweep still in progress' };
+  }
   if (!res.ok) {
     throw new Error(`Crucix latest failed: ${res.statusText}`);
   }

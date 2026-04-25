@@ -12,7 +12,7 @@ export const generateAndStoreArticle = async () => {
     const sweepData = await getCrucixLatest();
     if (!sweepData || sweepData.error) {
       logger.warn(`No sweep data available from Crucix: ${sweepData?.error || 'Empty response'}`);
-      return;
+      return false;
     }
 
     // For the sake of the prototype, we extract some key entities to query the graph context.
