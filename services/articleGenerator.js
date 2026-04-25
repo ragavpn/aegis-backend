@@ -18,12 +18,17 @@ export const generateAndStoreArticle = async () => {
     // 2. Prune data to avoid LLM token limits (especially for Groq free tier)
     const prunedData = JSON.parse(JSON.stringify(sweepData));
     if (prunedData.news) {
-      prunedData.news = prunedData.news.slice(0, 10).map(n => ({ title: n.title, summary: n.summary ? n.summary.substring(0, 300) : '' }));
+      prunedData.news = prunedData.news.slice(0, 5).map(n => ({ title: n.title, summary: n.summary ? n.summary.substring(0, 200) : '' }));
     }
     if (prunedData.tg && prunedData.tg.urgent) {
-      prunedData.tg.urgent = prunedData.tg.urgent.map(p => ({ source: p.source, text: p.text ? p.text.substring(0, 300) : '' }));
+      prunedData.tg.urgent = prunedData.tg.urgent.slice(0, 10).map(p => ({ source: p.source, text: p.text ? p.text.substring(0, 200) : '' }));
     }
-    delete prunedData.delta; // Remove large nested objects not strictly needed for the article
+    if (prunedData.tg) {
+      delete prunedData.tg.feed; // Very large array
+      delete prunedData.tg.posts;
+    }
+    delete prunedData.newsFeed;
+    delete prunedData.delta; 
     delete prunedData.ideas; 
 
     // We can run a preliminary pass to extract entities from sweep data or just pass no graph context initially
