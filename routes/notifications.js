@@ -5,6 +5,7 @@ import {
   getNotifications,
   markNotificationRead,
   deleteDeviceToken,
+  insertNotification,
 } from '../db/queries/notifications.js';
 import logger from '../utils/logger.js';
 
@@ -57,6 +58,26 @@ router.patch('/:id/read', async (req, res) => {
   } catch (error) {
     logger.error(`[Notifications] PATCH /:id/read: ${error.message}`);
     res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+/**
+ * POST /notifications/seed-test
+ * DEV ONLY — Insert a dummy notification for the authenticated user.
+ * Returns the notification object including its ID for testing PATCH /read.
+ */
+router.post('/seed-test', async (req, res) => {
+  try {
+    const notification = await insertNotification(req.user.id, {
+      tier: 'ROUTINE',
+      title: '[TEST] Aegis Intelligence Update',
+      body: 'This is a seeded test notification for API validation.',
+      articleId: null,
+    });
+    res.json({ data: notification });
+  } catch (error) {
+    logger.error(`[Notifications] seed-test: ${error.message}`);
+    res.status(500).json({ error: 'Failed to seed test notification' });
   }
 });
 
