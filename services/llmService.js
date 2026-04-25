@@ -127,3 +127,90 @@ ${articleText}
     return [];
   }
 };
+
+// Extracts up to 5 main entities from a user's conversational query to look up in Neo4j
+export const extractEntitiesFromQuery = async (query) => {
+  const model = getModel();
+  const systemInstruction = "You are a precise entity extraction assistant. The user will ask a question about geopolitics or finance. Extract up to 5 key entities (countries, commodities, companies, indices, organizations, people) from their query. Return EXACTLY a JSON array of strings with no markdown formatting. Example: [\"Russia\", \"WTI Crude Oil\", \"OPEC\"]";
+
+  try {
+    const res = await fetch(getBaseUrl(), {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: query }
+        ],
+        response_format: { type: "json_object" } 
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    let text = data.choices?.[0]?.message?.content || '[]';
+    
+    // Clean markdown
+    text = text.trim();
+    if (text.startsWith('\`\`\`json')) text = text.substring(7);
+    else if (text.startsWith('\`\`\`')) text = text.substring(3);
+    if (text.endsWith('\`\`\`')) text = text.substring(0, text.length - 3);
+    text = text.trim();
+    
+    let parsed = JSON.parse(text);
+    
+    if (!Array.isArray(parsed)) {
+      const arrayVals = Object.values(parsed).filter(Array.isArray);
+      parsed = arrayVals.length > 0 ? arrayVals[0] : [];
+    }
+
+    return parsed;
+  } catch (error) {
+    logger.error(`Failed to extract entities from query: ${error.message}`);
+    return [];
+  }
+};
+
+// Generates the final conversational response heavily grounded in Neo4j graph context
+export const chatWithRAG = async (messages, graphContext = "") => {
+  const model = getModel();
+  const systemInstruction = \`You are Aegis, an elite, highly intelligent geopolitical and financial analyst. You provide concise, deep, and actionable answers to the user's questions.
+
+When answering, ALWAYS prioritize the historical context and causal relationships provided below. If context is provided, trace the causal chain for the user so they understand WHY something is happening, not just WHAT is happening. If no graph context is relevant, answer using your general knowledge but state that you don't have recent Aegis Intelligence on that specific topic.
+
+Historical Knowledge Graph Context:
+\${graphContext ? graphContext : "None available for this query."}\`;
+
+  try {
+    const apiMessages = [
+      { role: 'system', content: systemInstruction },
+      ...messages
+    ];
+
+    const res = await fetch(getBaseUrl(), {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model,
+        messages: apiMessages
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  } catch (error) {
+    logger.error(`Failed to generate RAG chat response: ${error.message}`);
+    throw error;
+  }
+};
+

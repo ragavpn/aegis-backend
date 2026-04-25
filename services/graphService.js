@@ -68,13 +68,13 @@ export const storeEdges = async (edges, articleId) => {
 export const getGraphContext = async (entityNames) => {
   if (!entityNames || entityNames.length === 0) return "";
   
-  const session = getNeo4jSession();
+  const session = getSession();
   try {
     // Basic 2-hop retrieval
     const result = await session.run(`
       MATCH (n:Entity)-[r*1..2]-(m:Entity)
       WHERE n.name IN $entityNames
-      RETURN n.name AS source, [rel IN r | type(rel)] AS relationships, m.name AS target
+      RETURN n.name AS source, [rel IN r | rel.type] AS relationships, m.name AS target
       LIMIT 15
     `, { entityNames });
 
