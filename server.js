@@ -10,6 +10,9 @@ validateEnv();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust Railway's reverse proxy so express-rate-limit correctly identifies IPs
+app.set('trust proxy', 1);
+
 import { initNeo4j, verifyConnectivity } from './db/neo4jClient.js';
 initNeo4j();
 verifyConnectivity().catch(err => {

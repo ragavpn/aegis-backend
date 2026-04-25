@@ -37,8 +37,8 @@ router.get('/', async (req, res) => {
  */
 router.post('/generate', async (req, res) => {
   try {
-    const { generate } = await import('../services/articleGenerator.js');
-    await generate();
+    const { generateAndStoreArticle } = await import('../services/articleGenerator.js');
+    await generateAndStoreArticle();
     res.json({ data: { success: true } });
   } catch (error) {
     logger.error(`[Articles] POST /generate: ${error.message}`);

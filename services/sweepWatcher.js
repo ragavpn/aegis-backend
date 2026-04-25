@@ -41,8 +41,8 @@ const runSweepCheck = async () => {
       }
       logger.info(`Evaluated notification tier: ${notificationTier}`);
 
-      // We can pass notificationTier to the generator if needed in the future
-      const result = await generateAndStoreArticle();
+      // We pass notificationTier to the generator
+      const result = await generateAndStoreArticle(notificationTier);
       
       if (result === false) {
         logger.info('Sweep data not ready. Will check again on next interval.');

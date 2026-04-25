@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireAuth } from '../middleware/auth.js';
 import { extractEntitiesFromQuery, chatWithRAG } from '../services/llmService.js';
 import { getGraphContext } from '../services/graphService.js';
 import { getLatestArticles } from '../db/queries/articles.js';
@@ -6,6 +7,7 @@ import { createConversation, addMessage, getHistory, listConversations } from '.
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+router.use(requireAuth);
 
 // GET /conversations
 router.get('/', async (req, res) => {

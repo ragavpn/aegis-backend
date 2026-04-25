@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import logger from '../utils/logger.js';
-import { getAllDeviceTokens } from '../db/queries/tokens.js';
+import { getDeviceTokenForUser, getAllDeviceTokensWithUsers } from '../db/queries/tokens.js';
+import { insertNotification } from '../db/queries/notifications.js';
 
 let isInitialized = false;
 
@@ -25,38 +26,57 @@ const initFirebase = () => {
   }
 };
 
-export const sendArticleNotification = async (articleTitle, articleId) => {
+export const sendNotification = async (userId, { tier, title, body, articleId }) => {
   initFirebase();
   if (!isInitialized) return;
 
-  const tokens = await getAllDeviceTokens();
-  if (!tokens || tokens.length === 0) {
-    logger.info('No device tokens found. Skipping push notification.');
+  try {
+    // 1. Save notification to DB
+    await insertNotification(userId, { tier, title, body, articleId });
+
+    // 2. Fetch specific device token
+    const token = await getDeviceTokenForUser(userId);
+    if (!token) {
+      logger.info(`No device token found for user ${userId}. Skipping push notification.`);
+      return;
+    }
+
+    // 3. Send via FCM
+    const message = {
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        articleId: articleId ? articleId.toString() : ''
+      },
+      android: {
+        priority: tier === 'FLASH' ? 'high' : 'normal'
+      },
+      token: token
+    };
+
+    const response = await admin.messaging().send(message);
+    logger.info(`Successfully sent push notification to user ${userId}: ${response}`);
+  } catch (error) {
+    logger.error({ err: error }, `Error sending push notification to user ${userId}`);
+  }
+};
+
+export const broadcastArticleNotification = async (tier, title, body, articleId) => {
+  initFirebase();
+  if (!isInitialized) return;
+
+  const tokensWithUsers = await getAllDeviceTokensWithUsers();
+  if (!tokensWithUsers || tokensWithUsers.length === 0) {
+    logger.info('No device tokens found. Skipping broadcast.');
     return;
   }
 
-  const message = {
-    notification: {
-      title: 'Aegis Intelligence',
-      body: articleTitle,
-    },
-    data: {
-      articleId: articleId.toString()
-    },
-    tokens: tokens
-  };
-
-  try {
-    const response = await admin.messaging().sendMulticast(message);
-    logger.info(`Successfully sent ${response.successCount} push notifications.`);
-    if (response.failureCount > 0) {
-      response.responses.forEach((res, idx) => {
-        if (!res.success) {
-          logger.warn(`Failed to send push to token index ${idx}: ${res.error}`);
-        }
-      });
+  logger.info(`Broadcasting article to ${tokensWithUsers.length} users with tier ${tier}...`);
+  for (const { user_id } of tokensWithUsers) {
+    if (user_id) {
+      await sendNotification(user_id, { tier, title, body, articleId });
     }
-  } catch (error) {
-    logger.error({ err: error }, 'Error sending multicast push notification.');
   }
 };

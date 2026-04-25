@@ -9,7 +9,7 @@ export const getNotifications = async (userId, limit = 50) => {
     .from('notifications')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .order('sent_at', { ascending: false })
     .limit(limit);
 
   if (error) {
@@ -25,7 +25,7 @@ export const getNotifications = async (userId, limit = 50) => {
 export const markNotificationRead = async (userId, notificationId) => {
   const { error } = await supabase
     .from('notifications')
-    .update({ is_read: true })
+    .update({ read: true })
     .eq('id', notificationId)
     .eq('user_id', userId);
 
@@ -38,10 +38,10 @@ export const markNotificationRead = async (userId, notificationId) => {
 /**
  * Save a new notification row for a user.
  */
-export const insertNotification = async (userId, { title, body, type, actionUrl }) => {
+export const insertNotification = async (userId, { tier, title, body, articleId }) => {
   const { data, error } = await supabase
     .from('notifications')
-    .insert([{ user_id: userId, title, body, type, action_url: actionUrl, is_read: false }])
+    .insert([{ user_id: userId, tier, title, body, article_id: articleId, read: false }])
     .select()
     .single();
 

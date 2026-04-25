@@ -10,9 +10,12 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+// All routes below require auth
+router.use(requireAuth);
+
 /**
  * POST /notifications/register-token
- * Register FCM device token — no auth required, called on first launch.
+ * Register FCM device token — requires auth.
  */
 router.post('/register-token', async (req, res) => {
   const { token } = req.body;
@@ -20,16 +23,13 @@ router.post('/register-token', async (req, res) => {
     return res.status(400).json({ error: 'FCM token is required' });
   }
   try {
-    await saveDeviceToken(token);
+    await saveDeviceToken(req.user.id, token);
     res.json({ data: { success: true } });
   } catch (error) {
     logger.error(`[Notifications] register-token: ${error.message}`);
     res.status(500).json({ error: 'Failed to register token' });
   }
 });
-
-// All routes below require auth
-router.use(requireAuth);
 
 /**
  * GET /notifications
@@ -38,7 +38,7 @@ router.use(requireAuth);
 router.get('/', async (req, res) => {
   try {
     const notifications = await getNotifications(req.user.id);
-    const unreadCount = notifications.filter(n => !n.is_read).length;
+    const unreadCount = notifications.filter(n => !n.read).length;
     res.json({ data: { notifications, unreadCount } });
   } catch (error) {
     logger.error(`[Notifications] GET /: ${error.message}`);
