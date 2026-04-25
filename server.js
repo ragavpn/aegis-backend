@@ -33,11 +33,17 @@ import dataRoutes from './routes/data.js';
 import preferencesRoutes from './routes/preferences.js';
 import conversationsRoutes from './routes/conversations.js';
 import notificationsRoutes from './routes/notifications.js';
+import podcastsRoutes from './routes/podcasts.js';
+import interactionsRoutes from './routes/interactions.js';
+import articlesRoutes from './routes/articles.js';
 
 app.use('/data', dataRoutes);
 app.use('/preferences', preferencesRoutes);
 app.use('/conversations', conversationsRoutes);
 app.use('/notifications', notificationsRoutes);
+app.use('/podcasts', podcastsRoutes);
+app.use('/interactions', interactionsRoutes);
+app.use('/articles', articlesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

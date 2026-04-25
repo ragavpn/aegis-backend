@@ -226,3 +226,51 @@ When answering, synthesize the above intelligence with your analytical expertise
   }
 };
 
+// Generates a two-person dialogue (JSON array) based on an article
+export const generateDialogue = async (article, graphContext = "") => {
+  const model = getModel();
+  
+  const systemInstruction = `You are a podcast generator. Your task is to write a short 2-3 minute compelling dialogue between two hosts: "Alex" and "Jordan".
+They are discussing a recent intelligence report. 
+Your output MUST be a valid JSON array of objects, with no markdown formatting.
+Each object must have "speaker" (either "Alex" or "Jordan") and "text" (what they say).`;
+
+  const prompt = `
+Title: ${article.title}
+Summary: ${article.summary}
+Body: ${article.body}
+Context: ${graphContext}
+
+Write the dialogue as a raw JSON array.
+`;
+
+  try {
+    const res = await fetch(getBaseUrl(), {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    let content = data.choices?.[0]?.message?.content || '[]';
+    // Clean up potential markdown formatting around JSON
+    if (content.startsWith("\`\`\`json")) {
+      content = content.replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "").trim();
+    }
+    return JSON.parse(content);
+  } catch (error) {
+    logger.error(`Failed to generate dialogue: ${error.message}`);
+    throw error;
+  }
+};
