@@ -1,5 +1,5 @@
 import logger from '../utils/logger.js';
-import { supabase } from '../db/supabase.js';
+import { supabase } from '../db/supabaseClient.js';
 import { generateDialogue } from './llmService.js';
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
