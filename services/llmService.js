@@ -1,15 +1,19 @@
 import logger from '../utils/logger.js';
 
 const getHeaders = () => {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error("OPENROUTER_API_KEY is missing from environment variables");
+  if (!process.env.LLM_API_KEY) {
+    throw new Error("LLM_API_KEY is missing from environment variables");
   }
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    'Authorization': `Bearer ${process.env.LLM_API_KEY}`,
     'HTTP-Referer': 'https://github.com/ragavpn/aegis-backend',
     'X-Title': 'Aegis Backend',
   };
+};
+
+const getBaseUrl = () => {
+  return process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
 };
 
 const getModel = () => {
@@ -32,7 +36,7 @@ Write the analyst report:
   `;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(getBaseUrl(), {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -69,7 +73,7 @@ ${articleText}
   `;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(getBaseUrl(), {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
