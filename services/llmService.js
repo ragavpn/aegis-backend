@@ -13,7 +13,7 @@ const getHeaders = () => {
 };
 
 const getModel = () => {
-  return process.env.LLM_MODEL || 'meta-llama/llama-3.1-8b-instruct:free';
+  return process.env.LLM_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
 };
 
 // Generates an article based on the latest Crucix sweep data
