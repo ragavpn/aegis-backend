@@ -3,6 +3,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { getArticleById } from '../db/queries/articles.js';
 import { getPodcastByArticleId, savePodcast } from '../db/queries/podcasts.js';
 import { generatePodcast } from '../services/ttsService.js';
+import { extractEntities } from '../services/llmService.js';
+import { getGraphContext } from '../services/graphService.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -35,13 +37,19 @@ router.post('/generate', async (req, res) => {
       return res.status(404).json({ error: 'Article not found' });
     }
 
-    // 3. Generate the audio
-    const audio_url = await generatePodcast(article_id, article);
+    // 3. Retrieve Graph Context
+    logger.info(`[Podcasts] Extracting entities for article ${article_id}`);
+    const entities = await extractEntities(article.summary || article.body || "");
+    const graphContext = await getGraphContext(entities);
+    article.graphContext = graphContext;
 
-    // 4. Save to DB
-    await savePodcast(req.user.id, article_id, audio_url, 0);
+    // 4. Generate the audio
+    const { audioUrl, durationSeconds } = await generatePodcast(article_id, article);
 
-    res.json({ audio_url });
+    // 5. Save to DB
+    await savePodcast(req.user.id, article_id, audioUrl, durationSeconds);
+
+    res.json({ audio_url: audioUrl });
   } catch (error) {
     logger.error(`[Podcasts] Error generating podcast: ${error.message}`);
     res.status(500).json({ error: 'Failed to generate podcast audio' });

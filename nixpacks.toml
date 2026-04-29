@@ -1,5 +1,5 @@
 # nixpacks.toml — Railway build configuration for aegis-backend
-# Installs ffmpeg so the podcast generator can concatenate audio files
+# Note: ffmpeg was removed as we migrated to ElevenLabs Studio Podcast API
 
 [phases.setup]
-nixPkgs = ["ffmpeg"]
+nixPkgs = []

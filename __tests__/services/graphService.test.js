@@ -1,16 +1,17 @@
-import { normaliseEntities, getGraphContext } from '../../services/graphService.js';
+import { jest } from '@jest/globals';
+
+const mockSession = {
+  run: jest.fn(),
+  close: jest.fn()
+};
 
 // Mock the Neo4j client
-jest.mock('../../db/neo4jClient.js', () => {
-  return {
-    getSession: jest.fn(() => ({
-      run: jest.fn(),
-      close: jest.fn()
-    }))
-  };
-});
+jest.unstable_mockModule('../../db/neo4jClient.js', () => ({
+  getSession: jest.fn(() => mockSession)
+}));
 
-import { getSession } from '../../db/neo4jClient.js';
+const { normaliseEntities, getGraphContext } = await import('../../services/graphService.js');
+const { getSession } = await import('../../db/neo4jClient.js');
 
 describe('Graph Service', () => {
   describe('normaliseEntities', () => {
@@ -42,10 +43,7 @@ describe('Graph Service', () => {
   });
 
   describe('getGraphContext', () => {
-    let mockSession;
-
     beforeEach(() => {
-      mockSession = getSession();
       mockSession.run.mockClear();
       mockSession.close.mockClear();
     });

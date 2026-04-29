@@ -71,3 +71,15 @@ export const listConversations = async (userId) => {
       : null
   }));
 };
+
+export const deleteAllConversations = async (userId) => {
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    logger.error({ err: error }, 'Failed to delete conversations');
+    throw error;
+  }
+};

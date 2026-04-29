@@ -1,27 +1,30 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
-import notificationsRouter from '../../routes/notifications.js';
 
 // Mock dependencies
-jest.mock('../../middleware/auth.js', () => ({
+jest.unstable_mockModule('../../middleware/auth.js', () => ({
   requireAuth: (req, res, next) => {
     req.user = { id: 'test-user-id' };
     next();
   }
 }));
 
-jest.mock('../../db/queries/tokens.js', () => ({
+jest.unstable_mockModule('../../db/queries/tokens.js', () => ({
   saveDeviceToken: jest.fn().mockResolvedValue(true)
 }));
 
-jest.mock('../../db/queries/notifications.js', () => ({
+jest.unstable_mockModule('../../db/queries/notifications.js', () => ({
   getNotifications: jest.fn().mockResolvedValue([
-    { id: '1', is_read: false },
-    { id: '2', is_read: true }
+    { id: '1', read: false },
+    { id: '2', read: true }
   ]),
   markNotificationRead: jest.fn().mockResolvedValue(true),
-  deleteDeviceToken: jest.fn().mockResolvedValue(true)
+  deleteDeviceToken: jest.fn().mockResolvedValue(true),
+  insertNotification: jest.fn().mockResolvedValue({ id: 'test-id' })
 }));
+
+const { default: notificationsRouter } = await import('../../routes/notifications.js');
 
 const app = express();
 app.use(express.json());

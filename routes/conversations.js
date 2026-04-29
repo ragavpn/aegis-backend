@@ -3,7 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { extractEntitiesFromQuery, chatWithRAG } from '../services/llmService.js';
 import { getGraphContext } from '../services/graphService.js';
 import { getLatestArticles } from '../db/queries/articles.js';
-import { createConversation, addMessage, getHistory, listConversations } from '../db/queries/conversations.js';
+import { createConversation, addMessage, getHistory, listConversations, deleteAllConversations } from '../db/queries/conversations.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -110,6 +110,17 @@ router.post('/:id/messages', async (req, res) => {
   } catch (error) {
     logger.error(`Error in /conversations/:id/messages: ${error.message}`);
     res.status(500).json({ error: 'Failed to generate chat response' });
+  }
+});
+
+// DELETE /conversations — clear all conversation history for the authenticated user
+router.delete('/', async (req, res) => {
+  try {
+    await deleteAllConversations(req.user.id);
+    res.json({ success: true, message: 'All conversations deleted' });
+  } catch (error) {
+    logger.error(`Error in DELETE /conversations: ${error.message}`);
+    res.status(500).json({ error: 'Failed to delete conversations' });
   }
 });
 
