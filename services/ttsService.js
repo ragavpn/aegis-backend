@@ -47,37 +47,48 @@ const generateAudioWithElevenLabs = async (script) => {
   return Buffer.from(arrayBuffer);
 };
 
-// ─── HuggingFace Kokoro Provider (Free Serverless Inference API) ──────────────
+// ─── HuggingFace Kokoro Provider (via fal-ai router) ─────────────────────────
 const generateAudioWithHuggingFace = async (script) => {
   const hfToken = process.env.HF_TOKEN;
   if (!hfToken) throw new Error('HF_TOKEN is not set');
 
-  // Voice ID from Railway env, defaults to af_heart (warm American female voice)
   const voiceId = process.env.HUGGINGFACE_VOICE_ID || 'af_heart';
-  logger.info(`[TTS] Using HuggingFace Kokoro-82M (free serverless) with voice: ${voiceId}`);
+  logger.info(`[TTS] Using Kokoro (fal-ai router) with voice: ${voiceId}`);
 
-  // Use the free HF Serverless Inference API directly — no paid provider routing
-  const res = await fetch('https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M', {
+  // Use the HuggingFace router → fal-ai Kokoro endpoint
+  const res = await fetch('https://router.huggingface.co/fal-ai/fal-ai/kokoro/american-english', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${hfToken}`,
       'Content-Type': 'application/json',
-      'Accept': 'audio/flac',
     },
     body: JSON.stringify({
-      inputs: script,
-      parameters: {
-        voice: voiceId,
-      },
+      input: script,
+      voice: voiceId,
     }),
   });
 
   if (!res.ok) {
     const errTxt = await res.text().catch(() => res.statusText);
-    throw new Error(`HuggingFace TTS API failed: ${res.status} - ${errTxt}`);
+    throw new Error(`HuggingFace (fal-ai) TTS API failed: ${res.status} - ${errTxt}`);
   }
 
-  const arrayBuffer = await res.arrayBuffer();
+  const result = await res.json();
+  logger.info(`[TTS] fal-ai response keys: ${Object.keys(result).join(', ')}`);
+
+  // fal-ai returns { audio: { url: "https://..." } } or { audio_url: "..." }
+  const audioUrl = result?.audio?.url || result?.audio_url || result?.url;
+  if (!audioUrl) {
+    throw new Error(`fal-ai response missing audio URL. Response: ${JSON.stringify(result)}`);
+  }
+
+  logger.info(`[TTS] Downloading audio from: ${audioUrl}`);
+  const audioRes = await fetch(audioUrl);
+  if (!audioRes.ok) {
+    throw new Error(`Failed to download audio from fal-ai URL: ${audioRes.status}`);
+  }
+
+  const arrayBuffer = await audioRes.arrayBuffer();
   return Buffer.from(arrayBuffer);
 };
 
@@ -113,16 +124,11 @@ export const generatePodcast = async (articleId, article, durationScale = 'defau
     logger.info(`[TTS] Audio received (${audioBuffer.length} bytes). Uploading to Supabase...`);
 
     // Step 3: Upload to Supabase Storage
-    // HuggingFace Kokoro returns FLAC, ElevenLabs returns MP3
-    const isHF = service === 'huggingface';
-    const fileExt = isHF ? 'flac' : 'mp3';
-    const contentType = isHF ? 'audio/flac' : 'audio/mpeg';
-    const fileName = `${articleId}.${fileExt}`;
-
+    const fileName = `${articleId}.mp3`;
     const { error: uploadError } = await supabase.storage
       .from('podcasts')
       .upload(fileName, audioBuffer, {
-        contentType,
+        contentType: 'audio/mpeg',
         upsert: true,
       });
 
