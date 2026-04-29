@@ -1,16 +1,5 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
-import { generateDialogue } from './llmService.js';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
-import ffprobeStatic from 'ffprobe-static';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import { promisify } from 'util';
-
-const writeFileAsync = promisify(fs.writeFile);
-const unlinkAsync = promisify(fs.unlink);
 
 export const generatePodcast = async (articleId, article) => {
   try {
