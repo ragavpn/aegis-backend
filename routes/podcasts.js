@@ -15,7 +15,7 @@ router.use(requireAuth);
  * Body: { article_id: UUID }
  */
 router.post('/generate', async (req, res) => {
-  const { article_id } = req.body;
+  const { article_id, duration_scale } = req.body;
 
   if (!article_id) {
     return res.status(400).json({ error: 'article_id is required' });
@@ -44,7 +44,7 @@ router.post('/generate', async (req, res) => {
     article.graphContext = graphContext;
 
     // 4. Generate the audio
-    const { audioUrl, durationSeconds } = await generatePodcast(article_id, article);
+    const { audioUrl, durationSeconds } = await generatePodcast(article_id, article, duration_scale || 'default');
 
     // 5. Save to DB
     await savePodcast(req.user.id, article_id, audioUrl, durationSeconds);

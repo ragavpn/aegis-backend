@@ -1,7 +1,7 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
 
-export const generatePodcast = async (articleId, article) => {
+export const generatePodcast = async (articleId, article, durationScale = 'default') => {
   try {
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
@@ -44,7 +44,7 @@ export const generatePodcast = async (articleId, article) => {
           type: "text",
           text: sourceText
         },
-        duration_scale: "default",
+        duration_scale: durationScale,
         language: "en"
       })
     });
