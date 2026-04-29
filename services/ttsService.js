@@ -63,7 +63,7 @@ const generateAudioWithHuggingFace = async (script) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      input: script,
+      prompt: script,
       voice: voiceId,
     }),
   });
