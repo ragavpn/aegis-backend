@@ -1,7 +1,6 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
 import { generateMonologueScript } from './llmService.js';
-import { InferenceClient } from '@huggingface/inference';
 
 // ─── TTS Provider Config ──────────────────────────────────────────────────────
 // Set TTS_SERVICE in Railway to switch providers:
@@ -48,28 +47,37 @@ const generateAudioWithElevenLabs = async (script) => {
   return Buffer.from(arrayBuffer);
 };
 
-// ─── HuggingFace Kokoro Provider ──────────────────────────────────────────────
+// ─── HuggingFace Kokoro Provider (Free Serverless Inference API) ──────────────
 const generateAudioWithHuggingFace = async (script) => {
   const hfToken = process.env.HF_TOKEN;
   if (!hfToken) throw new Error('HF_TOKEN is not set');
 
   // Voice ID from Railway env, defaults to af_heart (warm American female voice)
   const voiceId = process.env.HUGGINGFACE_VOICE_ID || 'af_heart';
-  logger.info(`[TTS] Using HuggingFace Kokoro-82M with voice: ${voiceId}`);
+  logger.info(`[TTS] Using HuggingFace Kokoro-82M (free serverless) with voice: ${voiceId}`);
 
-  const client = new InferenceClient(hfToken);
-
-  const audioBlob = await client.textToSpeech({
-    provider: 'auto',
-    model: 'hexgrad/Kokoro-82M:fastest',
-    inputs: script,
-    parameters: {
-      voice: voiceId,
+  // Use the free HF Serverless Inference API directly — no paid provider routing
+  const res = await fetch('https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hfToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'audio/flac',
     },
+    body: JSON.stringify({
+      inputs: script,
+      parameters: {
+        voice: voiceId,
+      },
+    }),
   });
 
-  // Convert Blob → Buffer
-  const arrayBuffer = await audioBlob.arrayBuffer();
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => res.statusText);
+    throw new Error(`HuggingFace TTS API failed: ${res.status} - ${errTxt}`);
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
   return Buffer.from(arrayBuffer);
 };
 
@@ -105,11 +113,16 @@ export const generatePodcast = async (articleId, article, durationScale = 'defau
     logger.info(`[TTS] Audio received (${audioBuffer.length} bytes). Uploading to Supabase...`);
 
     // Step 3: Upload to Supabase Storage
-    const fileName = `${articleId}.mp3`;
+    // HuggingFace Kokoro returns FLAC, ElevenLabs returns MP3
+    const isHF = service === 'huggingface';
+    const fileExt = isHF ? 'flac' : 'mp3';
+    const contentType = isHF ? 'audio/flac' : 'audio/mpeg';
+    const fileName = `${articleId}.${fileExt}`;
+
     const { error: uploadError } = await supabase.storage
       .from('podcasts')
       .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
+        contentType,
         upsert: true,
       });
 
