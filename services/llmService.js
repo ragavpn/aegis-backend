@@ -326,3 +326,63 @@ Write the dialogue as a raw JSON array.
     throw error;
   }
 };
+
+// Generates a single-host monologue script based on an article
+export const generateMonologueScript = async (article, durationScale = 'default', graphContext = "") => {
+  const model = getModel();
+  
+  let targetWords = 600; // ~4 mins
+  let scaleDesc = "standard-length";
+  if (durationScale === 'short') {
+    targetWords = 300; // ~2 mins
+    scaleDesc = "short, snappy";
+  } else if (durationScale === 'long') {
+    targetWords = 1200; // ~8 mins
+    scaleDesc = "long, deeply analytical";
+  }
+
+  const systemInstruction = `You are the solo host of the 'AEGIS Intelligence' podcast. You blend the precise, analytical rigor of an intelligence officer with the conversational, engaging style of a top-tier news anchor. Your job is to connect the dots across defense, finance, and geopolitics.
+Your task is to write a highly engaging monologue script based on the provided intelligence report.
+The script should be ${scaleDesc}, roughly around ${targetWords} words.
+Speak directly to the listener ("Welcome back to AEGIS", "Let's dive into...", etc.). Make complex topics accessible but insightful. Build narrative tension, emphasize causality, and end with a forward-looking takeaway.
+IMPORTANT: Do not include any sound effects, stage directions, host names, or markdown formatting (like **bold**). Output purely the spoken text intended for a text-to-speech engine.`;
+
+  const prompt = `
+Title: ${article.title}
+Summary: ${article.summary}
+Body: ${article.body}
+Context: ${graphContext}
+
+Write the podcast monologue script:
+`;
+
+  try {
+    const res = await fetch(getBaseUrl(), {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    let content = data.choices?.[0]?.message?.content || '';
+    
+    // Ensure no markdown formatting
+    content = content.replace(/\\*\\*/g, "").replace(/\\*/g, "").replace(/#/g, "").trim();
+    
+    return content;
+  } catch (error) {
+    logger.error(`Failed to generate monologue script: ${error.message}`);
+    throw error;
+  }
+};
