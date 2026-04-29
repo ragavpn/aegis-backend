@@ -33,15 +33,19 @@ export const generatePodcast = async (articleId, article) => {
       },
       body: JSON.stringify({
         model_id: "eleven_multilingual_v2",
-        mode: "conversational",
+        mode: {
+          type: "conversation",
+          conversation: {
+            host_voice_id: hostVoiceId,
+            guest_voice_id: guestVoiceId
+          }
+        },
         source: {
-          source_type: "text",
+          type: "text",
           text: sourceText
         },
         duration_scale: "default",
-        language: "en",
-        host_voice_id: hostVoiceId,
-        guest_voice_id: guestVoiceId
+        language: "en"
       })
     });
 
@@ -51,7 +55,7 @@ export const generatePodcast = async (articleId, article) => {
     }
 
     const startData = await startResponse.json();
-    const podcastId = startData.podcast_id;
+    const podcastId = startData.project?.project_id || startData.podcast_id;
     
     if (!podcastId) {
         throw new Error("No podcast_id returned from ElevenLabs.");
