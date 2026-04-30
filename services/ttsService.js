@@ -155,10 +155,10 @@ export const generatePodcast = async (articleId, article, durationScale = 'defau
 };
 
 // Generates the daily digest podcast from a set of articles
-export const generateDailyDigestPodcast = async (articles) => {
+export const generateDailyDigestPodcast = async (articles, durationScale = 'default') => {
   try {
     logger.info(`[TTS] Generating daily digest from ${articles.length} articles...`);
-    const script = await generateDailyDigestScript(articles);
+    const script = await generateDailyDigestScript(articles, durationScale);
 
     if (!script || script.trim().length === 0) {
       throw new Error('LLM returned an empty daily digest script.');

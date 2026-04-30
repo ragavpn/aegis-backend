@@ -57,10 +57,12 @@ router.post('/generate', async (req, res) => {
 
 /**
  * POST /podcasts/generate-daily
+ * Body (optional): { duration_scale?: "short" | "default" | "long" }
  * Generates (or returns cached) a daily digest podcast from the last 24h articles.
- * No body required.
  */
 router.post('/generate-daily', async (req, res) => {
+  const durationScale = req.body?.duration_scale || 'default';
+
   try {
     // 1. Return cached digest if one was made in the last 24h
     const existing = await getDailyDigestPodcast();
@@ -75,10 +77,10 @@ router.post('/generate-daily', async (req, res) => {
       return res.status(404).json({ error: 'No articles found in the last 24 hours to create a digest.' });
     }
 
-    logger.info(`[Podcasts] Generating daily digest from ${articles.length} articles`);
+    logger.info(`[Podcasts] Generating daily digest (scale: ${durationScale}) from ${articles.length} articles`);
 
     // 3. Generate digest audio
-    const { audioUrl, durationSeconds } = await generateDailyDigestPodcast(articles);
+    const { audioUrl, durationSeconds } = await generateDailyDigestPodcast(articles, durationScale);
 
     // 4. Save to DB
     await saveDailyDigestPodcast(req.user.id, audioUrl, durationSeconds);

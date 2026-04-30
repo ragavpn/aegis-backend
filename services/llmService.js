@@ -330,9 +330,19 @@ Write the podcast monologue script:
 };
 
 // Generates a single-host daily digest script synthesising multiple articles from the last 24h
-export const generateDailyDigestScript = async (articles) => {
+export const generateDailyDigestScript = async (articles, durationScale = 'default') => {
   if (!articles || articles.length === 0) {
     throw new Error('No articles provided for daily digest.');
+  }
+
+  let targetWords = 700;
+  let scaleDesc = 'comprehensive';
+  if (durationScale === 'short') {
+    targetWords = 350;
+    scaleDesc = 'concise and punchy';
+  } else if (durationScale === 'long') {
+    targetWords = 1400;
+    scaleDesc = 'deep-dive and richly analytical';
   }
 
   const articlesSummary = articles
@@ -341,7 +351,7 @@ export const generateDailyDigestScript = async (articles) => {
 
   const systemInstruction = `You are the solo host of the 'AEGIS Intelligence' daily briefing podcast. You blend the precise, analytical rigor of an intelligence officer with the conversational energy of a top-tier news anchor. Your signature is connecting the dots — showing listeners how events in defense, finance, and geopolitics are intertwined.
 
-Your task: Write a compelling, unified daily digest monologue script that synthesises the top stories of the last 24 hours. This should be approximately 700-900 words.
+Your task: Write a ${scaleDesc} daily digest monologue script (~${targetWords} words) that synthesises the top stories of the last 24 hours.
 
 Structure it as:
 - A punchy 2-3 sentence opening hook ("Welcome back to AEGIS. Here is what moved the world in the last 24 hours...")
