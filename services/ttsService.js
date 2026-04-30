@@ -1,17 +1,18 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
 import { generateMonologueScript, generateDailyDigestScript } from './llmService.js';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
 // ─── TTS Provider Config ──────────────────────────────────────────────────────
 // Set TTS_SERVICE in Railway to switch providers:
 //   "elevenlabs"  → ElevenLabs standard TTS API   (needs ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
 //   "huggingface" → HuggingFace Kokoro via fal-ai  (needs HF_TOKEN, HUGGINGFACE_VOICE_ID)
+//   "edge"        → Microsoft Edge Read Aloud TTS  (NO API KEY — voice set via EDGE_TTS_VOICE)
 //   "local"       → aegis-tts sidecar (same Railway project, needs TTS_LOCAL_URL)
-//                   Set TTS_LOCAL_URL=http://aegis-tts.railway.internal:8000
 //
-// Defaults to "huggingface" if not set.
+// Defaults to "edge" if not set (free, no key needed).
 
-const getTTSService = () => (process.env.TTS_SERVICE || 'huggingface').toLowerCase();
+const getTTSService = () => (process.env.TTS_SERVICE || 'edge').toLowerCase();
 
 // ─── ElevenLabs Provider ──────────────────────────────────────────────────────
 const generateAudioWithElevenLabs = async (script) => {
@@ -116,14 +117,42 @@ const generateAudioWithLocal = async (script) => {
   return Buffer.from(arrayBuffer);
 };
 
+// ─── Microsoft Edge TTS Provider (msedge-tts) ────────────────────────────────
+// Uses Microsoft Edge's Read Aloud WebSocket API — NO API KEY required.
+// Set EDGE_TTS_VOICE to any neural voice name, e.g.:
+//   en-US-AriaNeural | en-US-GuyNeural | en-US-JennyNeural | en-GB-SoniaNeural
+// Full list: https://learn.microsoft.com/azure/cognitive-services/speech-service/language-support
+const generateAudioWithEdge = async (script) => {
+  const voice = process.env.EDGE_TTS_VOICE || 'en-US-AriaNeural';
+  logger.info(`[TTS] Using Microsoft Edge TTS | voice: ${voice}`);
+
+  const tts = new MsEdgeTTS();
+  await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+  const { audioStream } = tts.toStream(script);
+
+  const chunks = [];
+  await new Promise((resolve, reject) => {
+    audioStream.on('data', (chunk) => chunks.push(chunk));
+    audioStream.on('end', resolve);
+    audioStream.on('error', reject);
+  });
+
+  const buf = Buffer.concat(chunks);
+  if (buf.length === 0) throw new Error('Edge TTS returned empty audio');
+  logger.info(`[TTS] Edge TTS done (${buf.length} bytes)`);
+  return buf;
+};
+
 // ─── Shared provider router ───────────────────────────────────────────────────
 const generateAudio = async (script) => {
   const service = getTTSService();
   logger.info(`[TTS] TTS provider: "${service}"`);
   if (service === 'elevenlabs') return generateAudioWithElevenLabs(script);
   if (service === 'huggingface') return generateAudioWithHuggingFace(script);
+  if (service === 'edge') return generateAudioWithEdge(script);
   if (service === 'local') return generateAudioWithLocal(script);
-  throw new Error(`Unknown TTS_SERVICE value: "${service}". Use "elevenlabs", "huggingface", or "local".`);
+  throw new Error(`Unknown TTS_SERVICE: "${service}". Use "edge", "elevenlabs", "huggingface", or "local".`);
 };
 
 // ─── Generate single-article podcast ─────────────────────────────────────────
