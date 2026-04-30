@@ -34,8 +34,9 @@ export const savePodcast = async (userId, articleId, audioUrl, durationSeconds) 
   return data;
 };
 
-// Daily digest podcasts use a special sentinel article_id so they don't clash with per-article podcasts
-const DAILY_DIGEST_SENTINEL = '00000000-0000-0000-0000-000000000001';
+// Daily digest podcasts have no article_id (NULL) — distinguished from per-article podcasts
+// by the null article_id. The FK constraint must be dropped and article_id made nullable
+// via the Supabase migration: supabase/migrations/YYYYMMDD_drop_podcasts_article_fk.sql
 
 export const getDailyDigestPodcast = async () => {
   // Return only if generated within the last 24h
@@ -43,7 +44,7 @@ export const getDailyDigestPodcast = async () => {
   const { data, error } = await supabase
     .from('podcasts')
     .select('audio_url, duration_seconds, created_at')
-    .eq('article_id', DAILY_DIGEST_SENTINEL)
+    .is('article_id', null)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -61,7 +62,7 @@ export const saveDailyDigestPodcast = async (userId, audioUrl, durationSeconds) 
     .from('podcasts')
     .insert([{
       user_id: userId,
-      article_id: DAILY_DIGEST_SENTINEL,
+      article_id: null,   // NULL = daily digest (no single article)
       audio_url: audioUrl,
       duration_seconds: durationSeconds
     }])
