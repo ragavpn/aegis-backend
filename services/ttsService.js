@@ -146,22 +146,23 @@ const generateAudioWithEdge = async (script) => {
   return buf;
 };
 
-// ─── Kokoro-web Provider (self-hosted OpenAI-compatible API) ───────────────────────
+// ─── Kokoro-web Provider ─────────────────────────────────────────────────────
 // https://github.com/eduardolat/kokoro-web
-// Deploy as Docker container. Set KW_SECRET_API_KEY env var on the container
-// (leave blank to disable auth — then any key value works).
 //
-// Required env vars:
-//   KOKORO_WEB_URL   — base URL of your instance, e.g. http://kokoro-web.railway.internal:3000
-// Optional:
-//   KOKORO_WEB_API_KEY — any string (default: "aegis"). Must match KW_SECRET_API_KEY on host.
-//   KOKORO_WEB_VOICE   — Kokoro voice name (default: "af_heart")
-//   KOKORO_WEB_MODEL   — model quality: "model_q8f16" (best) | "model_q4" (fast). Default: "model_q8f16"
+// The PUBLIC hosted instance at https://voice-generator.pages.dev runs on
+// Cloudflare Pages Functions — the /api/v1/* routes are real server-side endpoints.
+// Auth is disabled on the public host, so any API key string works.
+// You can also self-host via Docker (ghcr.io/eduardolat/kokoro-web:latest).
+//
+// Optional env vars (all have sensible defaults — zero config needed):
+//   KOKORO_WEB_URL     — default: "https://voice-generator.pages.dev"
+//   KOKORO_WEB_API_KEY — default: "no-key" (any string works on the public host)
+//   KOKORO_WEB_VOICE   — default: "af_heart" (Kokoro voice ID)
+//   KOKORO_WEB_MODEL   — default: "model_q8f16" (best) | "model_q4" (faster)
 const generateAudioWithKokoroWeb = async (script) => {
-  const baseUrl = (process.env.KOKORO_WEB_URL || '').replace(/\/$/, '');
-  if (!baseUrl) throw new Error('KOKORO_WEB_URL is not set. Point it at your kokoro-web instance.');
+  const baseUrl = (process.env.KOKORO_WEB_URL || 'https://voice-generator.pages.dev').replace(/\/$/, '');
 
-  const apiKey = process.env.KOKORO_WEB_API_KEY || 'aegis'; // any string works when auth is disabled
+  const apiKey = process.env.KOKORO_WEB_API_KEY || 'no-key'; // public host has no auth, any string works
   const voice  = process.env.KOKORO_WEB_VOICE   || 'af_heart';
   const model  = process.env.KOKORO_WEB_MODEL   || 'model_q8f16';
 
