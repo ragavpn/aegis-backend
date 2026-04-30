@@ -4,8 +4,9 @@ import { generateMonologueScript, generateDailyDigestScript } from './llmService
 
 // ─── TTS Provider Config ──────────────────────────────────────────────────────
 // Set TTS_SERVICE in Railway to switch providers:
-//   "elevenlabs"  → ElevenLabs standard TTS API  (needs ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
-//   "huggingface" → HuggingFace Kokoro-82M inference (needs HF_TOKEN, HUGGINGFACE_VOICE_ID)
+//   "elevenlabs"  → ElevenLabs standard TTS API   (needs ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
+//   "huggingface" → HuggingFace Kokoro via fal-ai  (needs HF_TOKEN, HUGGINGFACE_VOICE_ID)
+//   "local"       → Self-hosted Kokoro-82M sidecar  (needs TTS_LOCAL_URL, e.g. http://aegis-tts.railway.internal:8000)
 //
 // Defaults to "huggingface" if not set.
 
@@ -92,7 +93,39 @@ const generateAudioWithHuggingFace = async (script) => {
   return Buffer.from(arrayBuffer);
 };
 
-// ─── Main Exported Function ───────────────────────────────────────────────────
+// ─── Local Kokoro Sidecar Provider ───────────────────────────────────────────
+// Calls the aegis-tts FastAPI sidecar running Kokoro-82M locally.
+// Set TTS_LOCAL_URL to the Railway internal URL: http://aegis-tts.railway.internal:8000
+const generateAudioWithLocal = async (script) => {
+  const baseUrl = (process.env.TTS_LOCAL_URL || 'http://localhost:8000').replace(/\/$/, '');
+  const voiceId = process.env.HUGGINGFACE_VOICE_ID || 'af_heart'; // reuse same variable
+  logger.info(`[TTS] Using local Kokoro sidecar at ${baseUrl} | voice: ${voiceId}`);
+
+  const res = await fetch(`${baseUrl}/synthesize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: script, voice: voiceId, speed: 1.0 }),
+  });
+
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => res.statusText);
+    throw new Error(`Local Kokoro sidecar failed: ${res.status} - ${errTxt}`);
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+};
+
+// ─── Shared provider router ───────────────────────────────────────────────────
+const generateAudio = async (script) => {
+  const service = getTTSService();
+  logger.info(`[TTS] TTS provider: "${service}"`);
+  if (service === 'elevenlabs') return generateAudioWithElevenLabs(script);
+  if (service === 'huggingface') return generateAudioWithHuggingFace(script);
+  if (service === 'local') return generateAudioWithLocal(script);
+  throw new Error(`Unknown TTS_SERVICE value: "${service}". Use "elevenlabs", "huggingface", or "local".`);
+};
+
 export const generatePodcast = async (articleId, article, durationScale = 'default') => {
   try {
     // Step 1: Generate the monologue script via LLM
@@ -106,29 +139,22 @@ export const generatePodcast = async (articleId, article, durationScale = 'defau
     logger.info(`[TTS] Script generated (${script.length} chars).`);
 
     // Step 2: Route to the correct TTS provider
-    const service = getTTSService();
-    logger.info(`[TTS] TTS provider: "${service}"`);
-
-    let audioBuffer;
-    if (service === 'elevenlabs') {
-      audioBuffer = await generateAudioWithElevenLabs(script);
-    } else if (service === 'huggingface') {
-      audioBuffer = await generateAudioWithHuggingFace(script);
-    } else {
-      throw new Error(`Unknown TTS_SERVICE value: "${service}". Use "elevenlabs" or "huggingface".`);
-    }
+    const audioBuffer = await generateAudio(script);
 
     if (!audioBuffer || audioBuffer.length === 0) {
       throw new Error('TTS provider returned an empty audio buffer.');
     }
     logger.info(`[TTS] Audio received (${audioBuffer.length} bytes). Uploading to Supabase...`);
 
-    // Step 3: Upload to Supabase Storage
-    const fileName = `${articleId}.mp3`;
+    // Step 3: Upload to Supabase Storage — WAV from local sidecar, MP3 from cloud providers
+    const service = getTTSService();
+    const ext = service === 'local' ? 'wav' : 'mp3';
+    const contentType = service === 'local' ? 'audio/wav' : 'audio/mpeg';
+    const fileName = `${articleId}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from('podcasts')
       .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
+        contentType,
         upsert: true,
       });
 
@@ -165,22 +191,20 @@ export const generateDailyDigestPodcast = async (articles, durationScale = 'defa
     }
     logger.info(`[TTS] Daily digest script ready (${script.length} chars). Sending to TTS...`);
 
-    const service = getTTSService();
-    let audioBuffer;
-    if (service === 'elevenlabs') {
-      audioBuffer = await generateAudioWithElevenLabs(script);
-    } else {
-      audioBuffer = await generateAudioWithHuggingFace(script);
-    }
+    const audioBuffer = await generateAudio(script);
 
     if (!audioBuffer || audioBuffer.length === 0) {
       throw new Error('TTS provider returned an empty audio buffer for daily digest.');
     }
 
-    const fileName = `daily-digest-${Date.now()}.mp3`;
+    const service = getTTSService();
+    const ext = service === 'local' ? 'wav' : 'mp3';
+    const contentType = service === 'local' ? 'audio/wav' : 'audio/mpeg';
+    const fileName = `daily-digest-${Date.now()}.${ext}`;
+
     const { error: uploadError } = await supabase.storage
       .from('podcasts')
-      .upload(fileName, audioBuffer, { contentType: 'audio/mpeg', upsert: true });
+      .upload(fileName, audioBuffer, { contentType, upsert: true });
 
     if (uploadError) throw uploadError;
 
