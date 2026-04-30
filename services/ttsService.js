@@ -149,20 +149,30 @@ const generateAudioWithEdge = async (script) => {
 // ─── Kokoro-web Provider ─────────────────────────────────────────────────────
 // https://github.com/eduardolat/kokoro-web
 //
-// The PUBLIC hosted instance at https://voice-generator.pages.dev runs on
-// Cloudflare Pages Functions — the /api/v1/* routes are real server-side endpoints.
-// Auth is disabled on the public host, so any API key string works.
-// You can also self-host via Docker (ghcr.io/eduardolat/kokoro-web:latest).
+// ⚠️  SELF-HOSTED ONLY — the public voice-generator.pages.dev site runs the
+// model via WebGPU in the browser; its /api/v1/audio/speech POST endpoint is
+// NOT active on the public deployment (returns 405).
 //
-// Optional env vars (all have sensible defaults — zero config needed):
-//   KOKORO_WEB_URL     — default: "https://voice-generator.pages.dev"
-//   KOKORO_WEB_API_KEY — default: "no-key" (any string works on the public host)
-//   KOKORO_WEB_VOICE   — default: "af_heart" (Kokoro voice ID)
-//   KOKORO_WEB_MODEL   — default: "model_q8f16" (best) | "model_q4" (faster)
+// To use this provider you must run the Docker image yourself:
+//   docker run -p 3000:3000 -e KW_SECRET_API_KEY=any-key ghcr.io/eduardolat/kokoro-web:latest
+// On Railway: add a new service from the Docker image in the same project, then
+// use the private network URL: http://<service>.railway.internal:3000
+//
+// Required env vars:
+//   KOKORO_WEB_URL     — base URL of your self-hosted instance (no default)
+// Optional:
+//   KOKORO_WEB_API_KEY — must match KW_SECRET_API_KEY on the container (default: "any-key")
+//   KOKORO_WEB_VOICE   — Kokoro voice ID (default: "af_heart")
+//   KOKORO_WEB_MODEL   — "model_q8f16" (best quality) | "model_q4" (faster, default: model_q8f16)
 const generateAudioWithKokoroWeb = async (script) => {
-  const baseUrl = (process.env.KOKORO_WEB_URL || 'https://voice-generator.pages.dev').replace(/\/$/, '');
+  const baseUrl = (process.env.KOKORO_WEB_URL || '').replace(/\/$/, '');
+  if (!baseUrl) throw new Error(
+    'KOKORO_WEB_URL is not set. kokoro-web must be self-hosted — ' +
+    'the public voice-generator.pages.dev does not expose a server-side API. ' +
+    'Run: docker run -p 3000:3000 ghcr.io/eduardolat/kokoro-web:latest'
+  );
 
-  const apiKey = process.env.KOKORO_WEB_API_KEY || 'no-key'; // public host has no auth, any string works
+  const apiKey = process.env.KOKORO_WEB_API_KEY || 'any-key'; // must match KW_SECRET_API_KEY on container
   const voice  = process.env.KOKORO_WEB_VOICE   || 'af_heart';
   const model  = process.env.KOKORO_WEB_MODEL   || 'model_q8f16';
 
