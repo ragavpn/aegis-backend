@@ -76,3 +76,19 @@ export const getArticleById = async (id) => {
   }
   return data;
 };
+
+export const getArticlesLast24Hours = async (limit = 10) => {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('articles')
+    .select('id, title, summary, modules')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    logger.error({ err: error }, 'Failed to fetch last-24h articles');
+    throw error;
+  }
+  return data;
+};

@@ -1,6 +1,6 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
-import { generateMonologueScript } from './llmService.js';
+import { generateMonologueScript, generateDailyDigestScript } from './llmService.js';
 
 // ─── TTS Provider Config ──────────────────────────────────────────────────────
 // Set TTS_SERVICE in Railway to switch providers:
@@ -150,6 +150,51 @@ export const generatePodcast = async (articleId, article, durationScale = 'defau
 
   } catch (error) {
     logger.error(`[TTS] Error generating podcast: ${error.message}`);
+    throw error;
+  }
+};
+
+// Generates the daily digest podcast from a set of articles
+export const generateDailyDigestPodcast = async (articles) => {
+  try {
+    logger.info(`[TTS] Generating daily digest from ${articles.length} articles...`);
+    const script = await generateDailyDigestScript(articles);
+
+    if (!script || script.trim().length === 0) {
+      throw new Error('LLM returned an empty daily digest script.');
+    }
+    logger.info(`[TTS] Daily digest script ready (${script.length} chars). Sending to TTS...`);
+
+    const service = getTTSService();
+    let audioBuffer;
+    if (service === 'elevenlabs') {
+      audioBuffer = await generateAudioWithElevenLabs(script);
+    } else {
+      audioBuffer = await generateAudioWithHuggingFace(script);
+    }
+
+    if (!audioBuffer || audioBuffer.length === 0) {
+      throw new Error('TTS provider returned an empty audio buffer for daily digest.');
+    }
+
+    const fileName = `daily-digest-${Date.now()}.mp3`;
+    const { error: uploadError } = await supabase.storage
+      .from('podcasts')
+      .upload(fileName, audioBuffer, { contentType: 'audio/mpeg', upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage.from('podcasts').getPublicUrl(fileName);
+    const audioUrl = publicUrlData.publicUrl;
+
+    const wordCount = script.split(/\s+/).length;
+    const durationSeconds = Math.round((wordCount / 130) * 60);
+
+    logger.info(`[TTS] Daily digest podcast generated (~${durationSeconds}s)`);
+    return { audioUrl, durationSeconds };
+
+  } catch (error) {
+    logger.error(`[TTS] Error generating daily digest: ${error.message}`);
     throw error;
   }
 };

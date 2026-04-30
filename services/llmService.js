@@ -328,3 +328,40 @@ Write the podcast monologue script:
     throw error;
   }
 };
+
+// Generates a single-host daily digest script synthesising multiple articles from the last 24h
+export const generateDailyDigestScript = async (articles) => {
+  if (!articles || articles.length === 0) {
+    throw new Error('No articles provided for daily digest.');
+  }
+
+  const articlesSummary = articles
+    .map((a, i) => `${i + 1}. ${a.title}\n   ${a.summary || '(no summary)'}`)
+    .join('\n\n');
+
+  const systemInstruction = `You are the solo host of the 'AEGIS Intelligence' daily briefing podcast. You blend the precise, analytical rigor of an intelligence officer with the conversational energy of a top-tier news anchor. Your signature is connecting the dots — showing listeners how events in defense, finance, and geopolitics are intertwined.
+
+Your task: Write a compelling, unified daily digest monologue script that synthesises the top stories of the last 24 hours. This should be approximately 700-900 words.
+
+Structure it as:
+- A punchy 2-3 sentence opening hook ("Welcome back to AEGIS. Here is what moved the world in the last 24 hours...")
+- Cover each major story with analysis, then bridge them together ("And here is where it gets interesting — these two events are not unrelated...")
+- Close with a sharp forward-looking takeaway ("Watch for...")
+
+IMPORTANT: Output purely the spoken text for a text-to-speech engine. No markdown, no bold, no stage directions, no episode numbers.`;
+
+  const prompt = `Here are today's top intelligence reports:\n\n${articlesSummary}\n\nWrite the daily briefing monologue:`;
+
+  try {
+    let content = await callLLM([
+      { role: 'system', content: systemInstruction },
+      { role: 'user', content: prompt },
+    ]);
+
+    content = content.replace(/\*\*/g, "").replace(/\*/g, "").replace(/^#+\s/gm, "").trim();
+    return content;
+  } catch (error) {
+    logger.error(`Failed to generate daily digest script: ${error.message}`);
+    throw error;
+  }
+};
