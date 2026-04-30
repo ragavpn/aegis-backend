@@ -1,5 +1,3 @@
 # nixpacks.toml — Railway build configuration for aegis-backend
-# Note: ffmpeg was removed as we migrated to ElevenLabs Studio Podcast API
-
-[phases.setup]
-nixPkgs = []
+# Using custom Dockerfile for multi-language (Node + Python/Kokoro) support.
+# Railway will auto-detect the Dockerfile and use it instead of nixpacks.

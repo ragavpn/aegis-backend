@@ -1,6 +1,12 @@
 import logger from '../utils/logger.js';
 import { supabase } from '../db/supabaseClient.js';
 import { generateMonologueScript, generateDailyDigestScript } from './llmService.js';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TTS_SCRIPT = path.resolve(__dirname, '../scripts/tts_kokoro.py');
 
 // ─── TTS Provider Config ──────────────────────────────────────────────────────
 // Set TTS_SERVICE in Railway to switch providers:
@@ -93,28 +99,46 @@ const generateAudioWithHuggingFace = async (script) => {
   return Buffer.from(arrayBuffer);
 };
 
-// ─── Local Kokoro Sidecar Provider ───────────────────────────────────────────
-// Calls the aegis-tts FastAPI sidecar running Kokoro-82M locally.
-// Set TTS_LOCAL_URL to the Railway internal URL: http://aegis-tts.railway.internal:8000
-const generateAudioWithLocal = async (script) => {
-  const baseUrl = (process.env.TTS_LOCAL_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const voiceId = process.env.HUGGINGFACE_VOICE_ID || 'af_heart'; // reuse same variable
-  logger.info(`[TTS] Using local Kokoro sidecar at ${baseUrl} | voice: ${voiceId}`);
+// ─── Local Kokoro Subprocess Provider ────────────────────────────────────────
+// Spawns scripts/tts_kokoro.py as a child process inside the same container.
+// No extra Railway service needed — Python + Kokoro are installed in the Dockerfile.
+const generateAudioWithLocal = (script) => new Promise((resolve, reject) => {
+  const voiceId = process.env.HUGGINGFACE_VOICE_ID || 'af_heart';
+  logger.info(`[TTS] Spawning Kokoro subprocess | voice: ${voiceId} | script: ${script.length} chars`);
 
-  const res = await fetch(`${baseUrl}/synthesize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: script, voice: voiceId, speed: 1.0 }),
+  const child = spawn('python3', [TTS_SCRIPT], {
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
 
-  if (!res.ok) {
-    const errTxt = await res.text().catch(() => res.statusText);
-    throw new Error(`Local Kokoro sidecar failed: ${res.status} - ${errTxt}`);
-  }
+  // Send text+params via stdin as JSON
+  child.stdin.write(JSON.stringify({ text: script, voice: voiceId, speed: 1.0 }));
+  child.stdin.end();
 
-  const arrayBuffer = await res.arrayBuffer();
-  return Buffer.from(arrayBuffer);
-};
+  // Collect WAV bytes from stdout
+  const chunks = [];
+  child.stdout.on('data', (chunk) => chunks.push(chunk));
+
+  // Forward stderr to our logger
+  child.stderr.on('data', (data) => {
+    logger.info(`[tts_kokoro.py] ${data.toString().trim()}`);
+  });
+
+  child.on('close', (code) => {
+    if (code !== 0) {
+      return reject(new Error(`Kokoro subprocess exited with code ${code}`));
+    }
+    const buf = Buffer.concat(chunks);
+    if (buf.length === 0) {
+      return reject(new Error('Kokoro subprocess produced no audio output'));
+    }
+    logger.info(`[TTS] Kokoro subprocess done (${buf.length} bytes)`);
+    resolve(buf);
+  });
+
+  child.on('error', (err) => {
+    reject(new Error(`Failed to spawn Kokoro subprocess: ${err.message}`));
+  });
+});
 
 // ─── Shared provider router ───────────────────────────────────────────────────
 const generateAudio = async (script) => {
