@@ -5,9 +5,11 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
 // ─── TTS Provider Config ──────────────────────────────────────────────────────
 // Set TTS_SERVICE in Railway to switch providers:
-//   "elevenlabs"  → ElevenLabs standard TTS API   (needs ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
+//   "edge"        → Microsoft Edge Read Aloud TTS  (NO API KEY — voice via EDGE_TTS_VOICE) [default]
+//   "kokoroweb"   → Kokoro-web self-hosted OpenAI-compatible API (needs KOKORO_WEB_URL)
+//                   API key optional — any string works if KW_SECRET_API_KEY is blank on host
 //   "huggingface" → HuggingFace Kokoro via fal-ai  (needs HF_TOKEN, HUGGINGFACE_VOICE_ID)
-//   "edge"        → Microsoft Edge Read Aloud TTS  (NO API KEY — voice set via EDGE_TTS_VOICE)
+//   "elevenlabs"  → ElevenLabs standard TTS API   (needs ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
 //   "local"       → aegis-tts sidecar (same Railway project, needs TTS_LOCAL_URL)
 //
 // Defaults to "edge" if not set (free, no key needed).
@@ -144,15 +146,58 @@ const generateAudioWithEdge = async (script) => {
   return buf;
 };
 
+// ─── Kokoro-web Provider (self-hosted OpenAI-compatible API) ───────────────────────
+// https://github.com/eduardolat/kokoro-web
+// Deploy as Docker container. Set KW_SECRET_API_KEY env var on the container
+// (leave blank to disable auth — then any key value works).
+//
+// Required env vars:
+//   KOKORO_WEB_URL   — base URL of your instance, e.g. http://kokoro-web.railway.internal:3000
+// Optional:
+//   KOKORO_WEB_API_KEY — any string (default: "aegis"). Must match KW_SECRET_API_KEY on host.
+//   KOKORO_WEB_VOICE   — Kokoro voice name (default: "af_heart")
+//   KOKORO_WEB_MODEL   — model quality: "model_q8f16" (best) | "model_q4" (fast). Default: "model_q8f16"
+const generateAudioWithKokoroWeb = async (script) => {
+  const baseUrl = (process.env.KOKORO_WEB_URL || '').replace(/\/$/, '');
+  if (!baseUrl) throw new Error('KOKORO_WEB_URL is not set. Point it at your kokoro-web instance.');
+
+  const apiKey = process.env.KOKORO_WEB_API_KEY || 'aegis'; // any string works when auth is disabled
+  const voice  = process.env.KOKORO_WEB_VOICE   || 'af_heart';
+  const model  = process.env.KOKORO_WEB_MODEL   || 'model_q8f16';
+
+  logger.info(`[TTS] Using Kokoro-web at ${baseUrl} | voice: ${voice} | model: ${model}`);
+
+  const res = await fetch(`${baseUrl}/api/v1/audio/speech`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model, voice, input: script }),
+  });
+
+  if (!res.ok) {
+    const errTxt = await res.text().catch(() => res.statusText);
+    throw new Error(`Kokoro-web API failed: ${res.status} - ${errTxt}`);
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  const buf = Buffer.from(arrayBuffer);
+  if (buf.length === 0) throw new Error('Kokoro-web returned empty audio');
+  logger.info(`[TTS] Kokoro-web done (${buf.length} bytes)`);
+  return buf;
+};
+
 // ─── Shared provider router ───────────────────────────────────────────────────
 const generateAudio = async (script) => {
   const service = getTTSService();
   logger.info(`[TTS] TTS provider: "${service}"`);
-  if (service === 'elevenlabs') return generateAudioWithElevenLabs(script);
+  if (service === 'elevenlabs')  return generateAudioWithElevenLabs(script);
   if (service === 'huggingface') return generateAudioWithHuggingFace(script);
-  if (service === 'edge') return generateAudioWithEdge(script);
-  if (service === 'local') return generateAudioWithLocal(script);
-  throw new Error(`Unknown TTS_SERVICE: "${service}". Use "edge", "elevenlabs", "huggingface", or "local".`);
+  if (service === 'edge')        return generateAudioWithEdge(script);
+  if (service === 'kokoroweb')   return generateAudioWithKokoroWeb(script);
+  if (service === 'local')       return generateAudioWithLocal(script);
+  throw new Error(`Unknown TTS_SERVICE: "${service}". Use "edge", "kokoroweb", "elevenlabs", "huggingface", or "local".`);
 };
 
 // ─── Generate single-article podcast ─────────────────────────────────────────
